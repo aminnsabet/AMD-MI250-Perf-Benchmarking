@@ -6,9 +6,9 @@ import seaborn as sns
 
 def main(dir):
     '''
-	Main function to run the pipeline. 
+        Main function to run the pipeline. 
         - Takes as argument a directory (dir)
-	Iniside the dir should be all the config.yaml files to run.
+        Iniside the dir should be all the config.yaml files to run.
     '''
     plots_dir = 'plots'
     os.makedirs(plots_dir, exist_ok=True)
@@ -52,44 +52,62 @@ def main(dir):
 
 def load_and_process_all_files(config_path, result_path):
     '''
-	Function to load the .json config and results files that are generated after each HOB experiments, and pre-process the data for the plots.
-	Arguments:
-	- config_path: path to the .json file containing the config of the experiment ran
-	- result_path: path to the .json file containing the results of the experiment ran
+        Function to load the .json config and results files that are generated after each HOB experiments, and pre-process the data for the plots.
+        Arguments:
+        - config_path: path to the .json file containing the config of the experiment ran
+        - result_path: path to the .json file containing the results of the experiment ran
     '''
 
     # Read the .json files and filter out the necessary information into separate dataframes
-    config_df = pd.read_json(config_path)
-    result_df = pd.read_json(result_path)
-    prefill_memory_df = pd.json_normalize(result_df['prefill']['memory'])
-    prefill_latency_df = pd.json_normalize(result_df['prefill']['latency'])
-    prefill_throughput_df = pd.json_normalize(result_df['prefill']['throughput'])
-    decode_memory_df = pd.json_normalize(result_df['decode']['memory'])
-    decode_latency_df = pd.json_normalize(result_df['decode']['latency'])
-    decode_throughput_df = pd.json_normalize(result_df['decode']['throughput'])
-    
-    # Pre-process te config file to remove all the NaNs. 
-    input_shapes_df = pd.json_normalize(config_df['benchmark'])
-    cleaned_df = input_shapes_df.dropna(how='all').ffill().bfill()
-    
-    batch_size = cleaned_df['batch_size'].iloc[0]
-    mean_prefill_latency = prefill_latency_df['mean'].iloc[0]
-    mean_decode_latency = decode_latency_df['mean'].iloc[0]
-    max_ram_prefill = prefill_memory_df['max_ram'].iloc[0]
-    max_ram_decode = decode_memory_df['max_ram'].iloc[0]
-    decode_throughput = decode_throughput_df['value'].iloc[0]
-    prefill_throughput = prefill_throughput_df['value'].iloc[0]
+    try:    
+        config_df = pd.read_json(config_path)
+        result_df = pd.read_json(result_path)
+    except FileNotFoundError as e:
+        print("The configuration file or result file was not found {e}")
+        return None
 
-    return batch_size, mean_prefill_latency, mean_decode_latency, max_ram_prefill, max_ram_decode, decode_throughput, prefill_throughput
+    try:
+        prefill_memory_df = pd.json_normalize(result_df['prefill']['memory'])
+        prefill_latency_df = pd.json_normalize(result_df['prefill']['latency'])
+        prefill_throughput_df = pd.json_normalize(result_df['prefill']['throughput'])
+        decode_memory_df = pd.json_normalize(result_df['decode']['memory'])
+        decode_latency_df = pd.json_normalize(result_df['decode']['latency'])
+        decode_throughput_df = pd.json_normalize(result_df['decode']['throughput'])
+    except KeyError as e:
+        print(f"Error: Missing expected data key in results {e}")
+        return None
+    # Pre-process te config file to remove all the NaNs. 
+    try:
+        input_shapes_df = pd.json_normalize(config_df['benchmark'])
+        cleaned_df = input_shapes_df.dropna(how='all').ffill().bfill()
+    
+        batch_size = cleaned_df['batch_size'].iloc[0]
+        mean_prefill_latency = prefill_latency_df['mean'].iloc[0]
+        mean_decode_latency = decode_latency_df['mean'].iloc[0]
+        max_ram_prefill = prefill_memory_df['max_ram'].iloc[0]
+        max_ram_decode = decode_memory_df['max_ram'].iloc[0]
+        decode_throughput = decode_throughput_df['value'].iloc[0]
+        prefill_throughput = prefill_throughput_df['value'].iloc[0]
+
+        return batch_size, mean_prefill_latency, mean_decode_latency, max_ram_prefill, max_ram_decode, decode_throughput, prefill_throughput
+    except Exception as e:
+        print(f"An error occured during the pre-processing of data {e}")
+        return None
+
 
 def get_all_data(dir):    
     '''
-	Function to get all the data from each experiment ran that are located inside dir. 
-	Arguments:
-	- dir: output directory of the experiments.
+        Function to get all the data from each experiment ran that are located inside dir. 
+        Arguments:
+        - dir: output directory of the experiments.
     '''
+    try:
+        if dir is not None:
+            base_dir = dir
 
-    base_dir = dir
+    except ValueError as e:
+        print(f"Error: No directory was given or directory {dir} does not exist {e}")
+        return None
 
     # initialise lists for data
     aggregated_batch_sizes = []
@@ -127,79 +145,108 @@ def get_all_data(dir):
 ### Plotting functions ###
 
 def plot_decode_memory(batch_sizes, max_ram):    
-    plot_data = pd.DataFrame({
-        'Batch Size': batch_sizes,
-        'Max RAM (MB)': max_ram
-    })
+    try:
+        if batch_sizes and max_ram is not None:
+            plot_data = pd.DataFrame({
+                'Batch Size': batch_sizes,
+                'Max RAM (MB)': max_ram
+            })
 
-    sns.set_theme(style='white')
-    sns.barplot(data=plot_data, x='Batch Size', y='Max RAM (MB)',hue='Batch Size', palette="rocket")
-    plt.title('Decode Max Memory per batch size')
-    plt.xlabel('Batch Size')
-    plt.ylabel('Max RAM (MB)')
-    
+            sns.set_theme(style='white')
+            sns.barplot(data=plot_data, x='Batch Size', y='Max RAM (MB)',hue='Batch Size', palette="rocket")
+            plt.title('Decode Max Memory per batch size')
+            plt.xlabel('Batch Size')
+            plt.ylabel('Max RAM (MB)')
+    except ValueError as e:
+        print(f"An error occured from missing values: {e}")
+        return None
 
-def plot_prefill_memory(batch_sizes, max_ram):    
-    plot_data = pd.DataFrame({
-        'Batch Size': batch_sizes,
-        'Max RAM (MB)': max_ram
-    })
+def plot_prefill_memory(batch_sizes, max_ram): 
+    try:
+        if batch_sizes and max_ram is not None:
+            plot_data = pd.DataFrame({
+                'Batch Size': batch_sizes,
+                'Max RAM (MB)': max_ram
+            })
 
-    sns.set_theme(style='white')
-    sns.barplot(data=plot_data, x='Batch Size', y='Max RAM (MB)',hue='Batch Size', palette="rocket")
-    plt.title('Decode Max Memory per batch size')
-    plt.xlabel('Batch Size')
-    plt.ylabel('Max RAM (MB)')
+            sns.set_theme(style='white')
+            sns.barplot(data=plot_data, x='Batch Size', y='Max RAM (MB)',hue='Batch Size', palette="rocket")
+            plt.title('Decode Max Memory per batch size')
+            plt.xlabel('Batch Size')
+            plt.ylabel('Max RAM (MB)')
+    except ValueError as e:
+        print(f"An error occured from missing values: {e}")
+        return None
     
 
 def plot_decode_latency(batch_sizes, mean_latencies):    
-    plot_data = pd.DataFrame({
-        'Batch Size': batch_sizes,
-        'Mean Latency (s)': mean_latencies
-    })
+    try:
+        if batch_sizes and mean_latencies is not None:
+            plot_data = pd.DataFrame({
+                'Batch Size': batch_sizes,
+                'Mean Latency (s)': mean_latencies
+            })
 
    
-    sns.lineplot(data=plot_data, x='Batch Size', y='Mean Latency (s)', marker='o')
-    plt.title('Decode Latency per Batch Size')
-    plt.xlabel('Batch Size')
-    plt.ylabel('Mean Latency (s)')
+            sns.lineplot(data=plot_data, x='Batch Size', y='Mean Latency (s)', marker='o')
+            plt.title('Decode Latency per Batch Size')
+            plt.xlabel('Batch Size')
+            plt.ylabel('Mean Latency (s)')
+    except ValueError as e:
+        print(f"An error occured from missing values: {e}")
+        return None
     
 
 def plot_prefill_latency(batch_sizes, mean_latencies):    
-    plot_data = pd.DataFrame({
-        'Batch Size': batch_sizes,
-        'Mean Latency (s)': mean_latencies
-    })
+    try:
+        if batch_sizes and mean_latencies is not None:
+            plot_data = pd.DataFrame({
+                'Batch Size': batch_sizes,
+                'Mean Latency (s)': mean_latencies
+            })
 
    
-    sns.lineplot(data=plot_data, x='Batch Size', y='Mean Latency (s)', marker='o')
-    plt.title('Prefill Latency per Batch Size')
-    plt.xlabel('Batch Size')
-    plt.ylabel('Mean Latency (s)')
+            sns.lineplot(data=plot_data, x='Batch Size', y='Mean Latency (s)', marker='o')
+            plt.title('Prefill Latency per Batch Size')
+            plt.xlabel('Batch Size')
+            plt.ylabel('Mean Latency (s)')
+    except ValueError as e:
+        print(f"An error occured from missing values: {e}")
+        return None
     
 
 def plot_decode_throughput(batch_sizes, decode_throughputs):
-    plot_data = pd.DataFrame({
-        'Batch Size': batch_sizes,
-        'Decode Throughput': decode_throughputs
-    })
-    sns.set_theme(style='white')
-    sns.barplot(data=plot_data, x='Batch Size', y='Decode Throughput',hue='Batch Size', palette="rocket")
-    plt.title('Decode throughput per batch size')
-    plt.xlabel('Batch Size')
-    plt.ylabel('Decode throughput')
+    try:
+        if batch_sizes and decode_throughputs is not None:            
+            plot_data = pd.DataFrame({
+                'Batch Size': batch_sizes,
+                'Decode Throughput': decode_throughputs
+            })
+            sns.set_theme(style='white')
+            sns.barplot(data=plot_data, x='Batch Size', y='Decode Throughput',hue='Batch Size', palette="rocket")
+            plt.title('Decode throughput per batch size')
+            plt.xlabel('Batch Size')
+            plt.ylabel('Decode throughput')
+    except ValueError as e:
+        print(f"An error occured from missing values: {e}")
+        return None
     
 
 def plot_prefill_throughput(batch_sizes, prefill_throughputs):
-    plot_data = pd.DataFrame({
-        'Batch Size': batch_sizes,
-        'Prefill Throughput': prefill_throughputs
-    })
-    sns.set_theme(style='white')
-    sns.barplot(data=plot_data, x='Batch Size', y='Prefill Throughput',hue='Batch Size', palette="rocket")
-    plt.title('Prefill Throughput per batch size')
-    plt.xlabel('Batch Size')
-    plt.ylabel('Prefill Throughput')
+    try:
+        if batch_sizes and prefill_throughputs is not None:
+            plot_data = pd.DataFrame({
+                'Batch Size': batch_sizes,
+                'Prefill Throughput': prefill_throughputs
+            })
+            sns.set_theme(style='white')
+            sns.barplot(data=plot_data, x='Batch Size', y='Prefill Throughput',hue='Batch Size', palette="rocket")
+            plt.title('Prefill Throughput per batch size')
+            plt.xlabel('Batch Size')
+            plt.ylabel('Prefill Throughput')
+    except ValueError as e:
+        print(f"An error occured from missing values: {e}")
+        return None
     
 
 if __name__ == "__main__":
