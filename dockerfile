@@ -1,52 +1,49 @@
-FROM ghcr.io/aminnsabet/llm-chat-bot/pytorch-vllm-rocm6:latest
-#FROM rocm/pytorch:rocm6.0.2_ubuntu22.04_py3.10_pytorch_2.1.2
-RUN apt-get update && \
-    apt-get install -y git && \
-    pip install --upgrade pip
 
+ARG ROCM_VERSION=rocm6.0.2_ubuntu22.04_py3.10_pytorch_2.1.2
+ARG TGI_VERSION=1.4.5
+
+#FROM ghcr.io/aminnsabet/llm-ot/pytorch-vllm-rocm6:latest
+FROM rocm/pytorch:rocm6.0.2_ubuntu22.04_py3.10_pytorch_2.1.2
 
 WORKDIR /home/
-RUN git clone https://github.com/ROCm/pyrsmi.git
-RUN git clone https://github.com/huggingface/optimum-benchmark.git
-RUN git clone https://github.com/aminnsabet/AMD-MI250-Perf-Benchmarking.git
-RUN git clone https://github.com/IlyasMoutawwakil/py-txi.git
-
-RUN pip install accelerate datasets hydra-core hydra-colorlog flatten-dict pandas flatten_dict transformers docker && \
-    pip install -U "huggingface_hub[cli]"
-
-
-WORKDIR /home/optimum-benchmark/
-RUN pip install --no-deps -e .
-
-WORKDIR /home/pyrsmi/
-RUN python3 -m pip install -e .
-
-WORKDIR /home
-############## FIX this for TGI 1.4.5
-WORKDIR /home/py-txi/
-RUN sed -i 's/text-generation-inference:latest-rocm/text-generation-inference:1.4.5-rocm/g' py_txi/text_generation_inference.py && \
-    pip install --no-deps -e .
-
-WORKDIR /home/optimum-benchmark/
-
-# Install amd-smi-lib
-RUN apt-get update && apt-get install -y amd-smi-lib
-
-# All installs to run optimum benchmark are done
+### TODO clean the documentation ###
+# Install the pyrsmi library.
+# Update important packages such as pip, install git, install amd-smi-lib
+# Installing all the python packages needed with no cache to reduce image size.
+# install TGI wrapper py-txi
+# Small fix to force previous and compatible version of TGI and install the TGI wrapper. 
 # Clone the config files and the automation script
-WORKDIR /home
-
-RUN mkdir /results
-
-WORKDIR /home/AMD-MI250-Perf-Benchmarking/ 
-RUN cp -r configs/ /home/optimum-benchmark/ && \
-    cp run_all.sh /home/optimum-benchmark/ && \
-    cp plot_pipeline.py /home/optimum-benchmark/ && \
-    chmod +x /home/optimum-benchmark/run_all.sh
-
+# Install optimum benchmark without it's dependencies to avoid errors. 
 # Add here the commands to run the experiments and get the results back. 
+# Cloning all the necessary repository for benchmarking. 1: pyrsmi provide additional features to ROCm smi. 2: Benchmarking tool. 3: Nscale repo for configs and scripts. 4: py-txi is a TGI wrapper for optimum benchmark. 
+RUN apt-get update && \
+    apt-get install -y git && \
+    rm -rf /var/lib/apt/lists/* && \
+    apt-get install -y amd-smi-lib && \
+    pip install --upgrade pip && \
+    pip install --no-cache-dir accelerate datasets hydra-core hydra-colorlog flatten-dict pandas flatten_dict transformers docker seaborn && \
+    pip install -U "huggingface_hub[cli]" && \
+    git clone https://github.com/ROCm/pyrsmi.git && \ 
+    git clone https://github.com/huggingface/optimum-benchmark.git && \
+    git clone https://github.com/aminnsabet/AMD-MI250-Perf-Benchmarking.git && \
+    git clone -b v0.5.1 https://github.com/IlyasMoutawwakil/py-txi.git && \ 
+    cd optimum-benchmark/ && \
+    git checkout 379b5ad && \
+    pip install --no-deps -e . && \
+    cd .. && \  
+    cp -r /home/AMD-MI250-Perf-Benchmarking/configs/ /home/optimum-benchmark/ && \
+    cp /home/AMD-MI250-Perf-Benchmarking/run_all.sh /home/optimum-benchmark/ && \
+    cp /home/AMD-MI250-Perf-Benchmarking/plot_pipeline.py /home/optimum-benchmark/ && \
+    cd /home/pyrsmi/ && \
+    python3 -m pip install -e . && \
+    cd /home/py-txi/ && \
+    sed -i 's/text-generation-inference:latest/text-generation-inference:1.4.5-rocm/g' py_txi/text_generation_inference.py && \
+    pip install --no-deps -e . && \
+    cd /opt/rocm/share/amd_smi && \
+    python3 -m pip install --upgrade pip \
+    && python3 -m pip install --user . && \
+    cd /home/optimum-benchmark/ && \
+    mkdir results
+
 WORKDIR /home/optimum-benchmark/
-RUN ls
-
-CMD ["./run_all.sh", "/configs/NousResearchLlama7B/", "Nrl_", "/results"]
-
+CMD ["./run_all.sh", "configs/NousResearchLlama7B/", "Nrl_", "/results"]
