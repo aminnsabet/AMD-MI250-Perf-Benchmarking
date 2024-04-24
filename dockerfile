@@ -1,9 +1,10 @@
 
 ARG ROCM_VERSION=rocm6.0.2_ubuntu22.04_py3.10_pytorch_2.1.2
-ARG TGI_VERSION=1.4.5
+ARG HF_TOKEN
+ARG TGI_VERSION=1.4.5-rocm/
 
 #FROM ghcr.io/aminnsabet/llm-ot/pytorch-vllm-rocm6:latest
-FROM rocm/pytorch:rocm6.0.2_ubuntu22.04_py3.10_pytorch_2.1.2
+FROM rocm/pytorch:$ROCM_VERSION
 
 WORKDIR /home/
 ### TODO clean the documentation ###
@@ -22,27 +23,23 @@ RUN apt-get update && \
     apt-get install -y amd-smi-lib && \
     pip install --upgrade pip && \
     pip install --no-cache-dir accelerate datasets hydra-core hydra-colorlog flatten-dict pandas flatten_dict transformers docker seaborn && \
-    pip install -U "huggingface_hub[cli]" && \
     git clone https://github.com/ROCm/pyrsmi.git && \ 
-    git clone https://github.com/huggingface/optimum-benchmark.git && \
-    git clone https://github.com/aminnsabet/AMD-MI250-Perf-Benchmarking.git && \
-    git clone -b v0.5.1 https://github.com/IlyasMoutawwakil/py-txi.git && \ 
+    git clone https://github.com/nscaledev/optimum-benchmark.git && \
+    git clone -b v0.5.1 https://github.com/nscaledev/py-txi.git && \
     cd optimum-benchmark/ && \
-    git checkout 379b5ad && \
     pip install --no-deps -e . && \
     cd .. && \  
-    cp -r /home/AMD-MI250-Perf-Benchmarking/configs/ /home/optimum-benchmark/ && \
-    cp /home/AMD-MI250-Perf-Benchmarking/run_all.sh /home/optimum-benchmark/ && \
-    cp /home/AMD-MI250-Perf-Benchmarking/plot_pipeline.py /home/optimum-benchmark/ && \
     cd /home/pyrsmi/ && \
     python3 -m pip install -e . && \
     cd /home/py-txi/ && \
-    sed -i 's/text-generation-inference:latest/text-generation-inference:1.4.5-rocm/g' py_txi/text_generation_inference.py && \
+    git checkout nscale && \
+    sed -i 's/text-generation-inference:1.4.5-rocm//text-generation-inference:$TGI_VERSION/g' py_txi/text_generation_inference.py && \
     pip install --no-deps -e . && \
     cd /opt/rocm/share/amd_smi && \
-    python3 -m pip install --upgrade pip \
-    && python3 -m pip install --user . && \
+    python3 -m pip install --upgrade pip && \
+    python3 -m pip install --user . && \
     cd /home/optimum-benchmark/ && \
+    export HUGGING_FACE_HUB_TOKEN=$HF_TOKEN && \
     mkdir results
 
 WORKDIR /home/optimum-benchmark/

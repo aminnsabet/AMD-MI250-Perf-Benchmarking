@@ -9,7 +9,7 @@ WORKDIR /home/
 RUN git clone https://github.com/ROCm/pyrsmi.git
 RUN git clone https://github.com/huggingface/optimum-benchmark.git
 RUN git clone https://github.com/aminnsabet/AMD-MI250-Perf-Benchmarking.git
-RUN git clone https://github.com/IlyasMoutawwakil/py-txi.git
+RUN git clone -b https://github.com/IlyasMoutawwakil/py-txi.git v0.5.1
 
 RUN pip install accelerate datasets hydra-core hydra-colorlog flatten-dict pandas flatten_dict transformers docker && \
     pip install -U "huggingface_hub[cli]"

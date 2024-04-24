@@ -25,7 +25,7 @@ benchmark:
 hydra:
   run:
     # where to store run results
-    dir: runs/NRL/${experiment_name}
+    dir: /home/optimum-benchmark/results/NRLlama/${experiment_name}
   sweep:
     # where to store sweep results
     dir: sweeps/${experiment_name}
